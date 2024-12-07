@@ -5,11 +5,11 @@ let timerInterval = null;
 
 let countries = [];
 let guessedCountries = new Set();
-const totalCountries = 197; // fixed count
+const totalCountries = 197;
 
-// Common abbreviations
 const abbreviations = {
     "usa": "United States of America",
+    "us": "United States of America",
     "uk": "United Kingdom",
     "uae": "United Arab Emirates",
     "car": "Central African Republic",
@@ -25,7 +25,10 @@ const svg = d3.select("#map");
 const width = 1200;
 const height = 600;
 
-const projection = d3.geoMercator().scale(130).translate([width / 2, height / 2]);
+const projection = d3.geoMercator()
+    .scale(130)
+    .translate([width / 2, height / 2]);
+
 const path = d3.geoPath().projection(projection);
 
 let currentTransform = d3.zoomIdentity;
@@ -35,11 +38,8 @@ const zoom = d3.zoom()
     .on("zoom", (event) => {
         currentTransform = event.transform;
         g.attr("transform", currentTransform);
-        updateTiles();
     });
 
-const tile = d3.tile().size([width, height]);
-const tileGroup = svg.append("g");
 const g = svg.append("g");
 
 d3.json("world.geojson").then(data => {
@@ -61,12 +61,11 @@ d3.json("world.geojson").then(data => {
      });
 
     svg.call(zoom);
-    updateTiles(); // Draw initial tiles
 });
 
 startBtn.addEventListener("click", startGame);
 guessInput.addEventListener("input", handleGuess);
-document.addEventListener('keydown', () => { guessInput.focus(); });
+document.addEventListener('keydown', () => guessInput.focus());
 
 function startGame() {
     startBtn.disabled = true;
@@ -99,7 +98,6 @@ function updateTimerDisplay() {
 function endGame() {
     guessInput.disabled = true;
     if (guessedCountries.size === totalCountries) {
-        // All guessed
         const totalTimeTaken = TIMER_DURATION - timeRemaining;
         const m = Math.floor(totalTimeTaken / 60);
         const s = totalTimeTaken % 60;
@@ -112,7 +110,6 @@ function endGame() {
         congratsMessage.textContent = `Congratulations! You guessed all countries in ${finalTime}.`;
         document.getElementById('game-container').appendChild(congratsMessage);
     } else {
-        // Time ran out
         const message = document.createElement('div');
         message.style.marginTop = '20px';
         message.style.fontSize = '18px';
@@ -138,9 +135,8 @@ function handleGuess() {
         guessInput.value = '';
         guessedCountSpan.textContent = `${guessedCountries.size}/${totalCountries}`;
 
-        // If the entire country is off-screen, pan it into view
         if (isCountryFullyOutOfView(matchedCountry)) {
-            panToCountry(matchedCountry);
+            centerOnCountry(matchedCountry);
         }
     }
 }
@@ -175,81 +171,26 @@ function isCountryFullyOutOfView(country) {
     const topLeft = t.apply(bounds[0]);
     const bottomRight = t.apply(bounds[1]);
 
-    // Entirely left: right edge < 0
-    if (bottomRight[0] < 0) return true;
-    // Entirely right: left edge > width
-    if (topLeft[0] > width) return true;
-    // Entirely above: bottom edge < 0
-    if (bottomRight[1] < 0) return true;
-    // Entirely below: top edge > height
-    if (topLeft[1] > height) return true;
+    if (bottomRight[0] < 0) return true;       // Entirely left
+    if (topLeft[0] > width) return true;       // Entirely right
+    if (bottomRight[1] < 0) return true;       // Entirely above
+    if (topLeft[1] > height) return true;      // Entirely below
 
     return false;
 }
 
-function panToCountry(country) {
-    const bounds = path.bounds(country.feature);
-    const t = currentTransform;
-    const scale = t.k;
+function centerOnCountry(country) {
+    const centroid = path.centroid(country.feature); // Get the country's centroid (map coordinates)
+    const scale = currentTransform.k; // Keep the current zoom level (scale)
 
-    const topLeft = t.apply(bounds[0]);
-    const bottomRight = t.apply(bounds[1]);
+    // Calculate new translation to move the country's centroid to the center of the map
+    const translateX = width / 2 - centroid[0] * scale;
+    const translateY = height / 2 - centroid[1] * scale;
 
-    let dx = 0, dy = 0;
+    // Update the current transform state
+    const newTransform = d3.zoomIdentity.translate(translateX, translateY).scale(scale);
 
-    if (bottomRight[0] < 0) {
-        // Entirely to the left: move right
-        dx = width/2 - (topLeft[0] + bottomRight[0])/2;
-    }
-    else if (topLeft[0] > width) {
-        // Entirely to the right: move left
-        dx = width/2 - (topLeft[0] + bottomRight[0])/2;
-    }
-
-    if (bottomRight[1] < 0) {
-        // Entirely above: move down
-        dy = height/2 - (topLeft[1] + bottomRight[1])/2;
-    }
-    else if (topLeft[1] > height) {
-        // Entirely below: move up
-        dy = height/2 - (topLeft[1] + bottomRight[1])/2;
-    }
-
-    // Adjust by scale
-    dx = dx / scale;
-    dy = dy / scale;
-
-    const newTransform = d3.zoomIdentity
-        .translate(t.x + dx*scale, t.y + dy*scale)
-        .scale(scale);
-
-    svg.transition()
-       .duration(750)
-       .call(zoom.transform, newTransform);
-}
-
-function updateTiles() {
-    const t = currentTransform;
-    const scale = t.k / projection.scale();
-    const translate = [t.x, t.y];
-
-    const tiles = tile
-        .scale(projection.scale() * 2 * Math.PI * scale)
-        .translate(translate)();
-
-    const image = tileGroup
-        .selectAll("image")
-        .data(tiles, d => d);
-
-    image.exit().remove();
-
-    image.enter().append("image")
-        .attr("xlink:href", d => `https://stamen-tiles.a.ssl.fastly.net/terrain-background/${d[2]}/${d[0]}/${d[1]}.png`)
-        .attr("x", d => d[0] * 256)
-        .attr("y", d => d[1] * 256)
-        .attr("width", 256)
-        .attr("height", 256);
-
-    tileGroup
-        .attr("transform", `scale(${tiles.scale})translate(${tiles.translate[0]},${tiles.translate[1]})`);
+    // Apply the new transformation
+    g.attr("transform", newTransform.toString());
+    currentTransform = newTransform; // Update the global current transform
 }
