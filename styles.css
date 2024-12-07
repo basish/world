@@ -64,3 +64,15 @@ h1 {
     stroke-width: 0.5px;
     fill-opacity: 0.8;
 }
+
+#map-container {
+    background-color: #cce7ff; /* Light blue for the ocean */
+    border: 1px solid #ccc; /* Optional: Keep or remove the border */
+}
+
+#map {
+    background-color: #cce7ff; /* Ensure map SVG background is also light blue */
+    width: 100%;
+    height: 600px;
+}
+
