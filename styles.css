@@ -44,7 +44,7 @@ h1 {
 .country {
     fill: #d8d8d8;
     stroke: #333;
-    stroke-width: 0.1px; /* Even thinner border */
+    stroke-width: 0.1px;
     cursor: pointer;
 }
 
@@ -56,4 +56,11 @@ h1 {
     fill: green;  
     text-anchor: middle;
     pointer-events: none;
+    font-weight: normal; /* less bold */
+}
+
+.hovered {
+    stroke: black;
+    stroke-width: 0.5px;
+    fill-opacity: 0.8;
 }
