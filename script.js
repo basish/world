@@ -10,7 +10,6 @@ const totalCountries = 197; // fixed count
 // Common abbreviations
 const abbreviations = {
     "usa": "United States of America",
-    "us": "United States of America",
     "uk": "United Kingdom",
     "uae": "United Arab Emirates",
     "car": "Central African Republic",
