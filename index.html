@@ -18,25 +18,8 @@
         <input type="text" id="guess-input" placeholder="Type a country..." disabled />
         <span>Guessed: <span id="guessed-count">0/197</span></span>
     </div>
-    <div id="continent-stats" style="margin-bottom:10px;"></div><!-- Added to show continent counts -->
     <div id="map-container">
         <svg id="map"></svg>
-    </div>
-
-    <div id="leaderboard-container">
-        <h2>Leaderboard</h2>
-        <table id="leaderboard">
-            <thead>
-                <tr>
-                    <th>Rank</th>
-                    <th>Name</th>
-                    <th>Date</th>
-                    <th>Countries Guessed</th>
-                    <th>Time</th>
-                </tr>
-            </thead>
-            <tbody></tbody>
-        </table>
     </div>
 </div>
 
@@ -44,15 +27,13 @@
 <script>
 ////////////////////
 // Configuration
-const TIMER_DURATION = 15 * 60; // 15 minutes
+const TIMER_DURATION = 15 * 60; // 15 minutes in seconds
 let timeRemaining = TIMER_DURATION;
 let timerInterval = null;
 let isPaused = false;
 let isGameOver = false;
 let userName = "";
-let gameStartTime = null; 
-let currentUserTemp = null; 
-let previousUserRank = null; // track old rank
+let gameStartTime = null;
 
 let countries = [];
 let guessedCountries = new Set();
@@ -66,36 +47,8 @@ const abbreviations = {
     "drc": "Democratic Republic of the Congo"
 };
 
-// Define 7 continents
-const allContinents = ["Africa","Asia","Europe","North America","South America","Oceania","Antarctica"];
-
-// continentCounts and continentTotals
-let continentCounts = {};
-let continentTotals = {};
-allContinents.forEach(cont => {
-    continentCounts[cont] = 0;
-    continentTotals[cont] = 0;
-});
-
-// You must provide a mapping from country name to continent
-// Example (fill in properly):
-// const continents = {
-//   "United States of America": "North America",
-//   "France": "Europe",
-//   ...
-// };
-const continents = {};
-
-// Update continent stats display
-function updateContinentStats() {
-    let html = '';
-    allContinents.forEach(cont => {
-        const got = continentCounts[cont] || 0;
-        const tot = continentTotals[cont] || 0;
-        html += `<span style="margin-right:10px;">${cont}: ${got}/${tot}</span>`;
-    });
-    document.getElementById('continent-stats').innerHTML = html;
-}
+// We will store references to the circles for each country
+let countryCircles = new Map();
 
 const startBtn = document.getElementById('start-btn');
 const pauseBtn = document.getElementById('pause-btn');
@@ -122,10 +75,34 @@ const zoom = d3.zoom()
 
 const g = svg.append("g");
 
-// Load leaderboard
-let leaderboard = loadLeaderboard();
+// Load GeoJSON
+d3.json("world.geojson").then(data => {
+    countries = data.features.map(d => ({
+        name: d.properties.ADMIN,
+        feature: d
+    }));
 
-// Event listeners
+    g.selectAll("path")
+     .data(data.features)
+     .enter().append("path")
+     .attr("class", "country")
+     .attr("d", path);
+
+    // Add a small light blue circle for each country at its centroid
+    countries.forEach(c => {
+        const centroid = path.centroid(c.feature);
+        const circle = g.append("circle")
+            .attr("cx", centroid[0])
+            .attr("cy", centroid[1])
+            .attr("r", .5) // small circle
+            .attr("fill", "darkblue");
+
+        countryCircles.set(c.name, circle);
+    });
+
+    svg.call(zoom);
+});
+
 nameInput.addEventListener('input', () => {
     startBtn.disabled = !nameInput.value.trim();
 });
@@ -137,31 +114,6 @@ guessInput.addEventListener("input", handleGuess);
 
 document.addEventListener('keydown', () => {
     if (!isPaused && !isGameOver) guessInput.focus();
-});
-
-// Load your world.geojson as before
-d3.json("world.geojson").then(data => {
-    countries = data.features.map(d => ({
-        name: d.properties.ADMIN,
-        feature: d
-    }));
-
-    // Compute continent totals
-    countries.forEach(c => {
-        const cont = continents[c.name];
-        if (cont && allContinents.includes(cont)) {
-            continentTotals[cont] = (continentTotals[cont] || 0) + 1;
-        }
-    });
-    updateContinentStats();
-
-    g.selectAll("path")
-     .data(data.features)
-     .enter().append("path")
-     .attr("class", "country")
-     .attr("d", path);
-
-    svg.call(zoom);
 });
 
 function startGame() {
@@ -226,6 +178,7 @@ function handleGuess() {
     if (isPaused || isGameOver) return;
     let currentGuess = guessInput.value.trim().toLowerCase();
 
+    // Apply abbreviations if any
     if (abbreviations[currentGuess]) {
         currentGuess = abbreviations[currentGuess].toLowerCase();
     }
@@ -240,18 +193,18 @@ function handleGuess() {
         guessInput.value = '';
         guessedCountSpan.textContent = `${guessedCountries.size}/${totalCountries}`;
 
-        // Update continent count if known
-        const cont = continents[matchedCountry.name];
-        if (cont && allContinents.includes(cont)) {
-            continentCounts[cont] = (continentCounts[cont] || 0) + 1;
-            updateContinentStats();
+        // Remove the circle for this country since it's now guessed
+        const circle = countryCircles.get(matchedCountry.name);
+        if (circle) {
+            circle.remove();
+            countryCircles.delete(matchedCountry.name);
         }
-
-        updateLeaderboardEntry();
     }
 }
 
-// Adjusted font size to be 25% smaller than previous stable code
+// Further reduce font size by another 30% from previously stable code
+// Previously finalFontSize = scaledFontSize * 0.8
+// Now finalFontSize = scaledFontSize * 0.8 * 0.7 = scaledFontSize * 0.56 (44% reduction from original)
 function computeFontSize(feature) {
     const bounds = path.bounds(feature);
     const boxWidth = bounds[1][0] - bounds[0][0];
@@ -259,7 +212,7 @@ function computeFontSize(feature) {
 
     const rawFontSize = Math.min(boxWidth, boxHeight) / 50;
     const scaledFontSize = rawFontSize * 0.7; 
-    const finalFontSize = scaledFontSize * 0.8 * 0.75; // 20% smaller * additional 25% smaller
+    const finalFontSize = scaledFontSize * 0.8 * 0.7; // apply the additional 30% reduction
     return Math.max(Math.min(finalFontSize, 12), 4);
 }
 
@@ -267,7 +220,7 @@ function animateCountryGuess(country) {
     const sel = g.selectAll("path")
       .filter(d => d.properties.ADMIN === country.name);
 
-    // Initial lighter green and fade over 1.8s
+    // lighter green initially and fade over 1.8s
     sel
       .transition().duration(0)
       .style("fill", "#c0ffc0")
@@ -297,7 +250,7 @@ function endGame() {
 
     const missingCountries = countries.filter(c => !guessedCountries.has(c.name));
     missingCountries.forEach(m => {
-        const fontSize = computeFontSize(m.feature); 
+        const fontSize = computeFontSize(m.feature);
         const centroid = path.centroid(m.feature);
         g.append("text")
           .attr("class", "country-label missed-label")
@@ -310,11 +263,6 @@ function endGame() {
          .filter(d => d.properties.ADMIN === m.name)
          .classed("missed", true);
     });
-
-    const totalGuessed = guessedCountries.size;
-    const totalTimeTaken = (TIMER_DURATION - timeRemaining);
-
-    addToLeaderboard(userName, totalGuessed, totalTimeTaken);
 }
 
 function endGameEarly() {
@@ -323,118 +271,14 @@ function endGameEarly() {
     endGame();
 }
 
-// Leaderboard Functions
-function loadLeaderboard() {
-    const data = localStorage.getItem("world_game_leaderboard");
-    return data ? JSON.parse(data) : [];
-}
+// If you want to use a different map/GeoJSON file, you can simply replace "world.geojson" with another file,
+// ensuring it has a similar structure (FeatureCollection with features having properties.ADMIN for country names).
+// Reputable sources include:
+// - Natural Earth (https://www.naturalearthdata.com/)
+// - GADM (https://gadm.org/)
+// - GeoBoundaries (https://www.geoboundaries.org/)
 
-function saveLeaderboard() {
-    localStorage.setItem("world_game_leaderboard", JSON.stringify(leaderboard));
-}
-
-function addToLeaderboard(name, countriesGuessed, timeTaken) {
-    const entry = {
-        name: name,
-        date: new Date().toLocaleString([], {year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit'}),
-        countriesGuessed: countriesGuessed,
-        timeTaken: timeTaken
-    };
-
-    leaderboard.push(entry);
-    sortLeaderboard();
-    trimLeaderboard();
-    saveLeaderboard();
-    renderLeaderboard();
-}
-
-function formatTime(seconds) {
-    const m = Math.floor(seconds / 60);
-    const s = seconds % 60;
-    return `${m}:${s.toString().padStart(2,'0')}`;
-}
-
-function sortLeaderboard() {
-    leaderboard.sort((a, b) => {
-        if (b.countriesGuessed === a.countriesGuessed) {
-            return a.timeTaken - b.timeTaken;
-        }
-        return b.countriesGuessed - a.countriesGuessed;
-    });
-}
-
-function trimLeaderboard() {
-    if (leaderboard.length > 15) {
-        leaderboard = leaderboard.slice(0,15);
-    }
-}
-
-function renderLeaderboard(highlightEntry=null) {
-    const tbody = document.querySelector("#leaderboard tbody");
-    tbody.innerHTML = '';
-
-    leaderboard.forEach((entry, i) => {
-        const tr = document.createElement('tr');
-        const rank = i+1;
-        tr.innerHTML = `
-          <td>${rank}</td>
-          <td>${entry.name}</td>
-          <td>${entry.date}</td>
-          <td>${entry.countriesGuessed}</td>
-          <td>${formatTime(entry.timeTaken)}</td>
-        `;
-        if (highlightEntry === entry) {
-            tr.classList.add('leaderboard-highlight');
-        }
-        tbody.appendChild(tr);
-    });
-}
-
-function getUserRank(entry) {
-    const idx = leaderboard.indexOf(entry);
-    return idx >= 0 ? idx+1 : Infinity;
-}
-
-function updateLeaderboardEntry() {
-    const countriesGuessedNow = guessedCountries.size;
-    const timeTaken = Math.floor((Date.now() - gameStartTime) / 1000);
-
-    if (!currentUserTemp) {
-        currentUserTemp = {
-            name: userName,
-            date: new Date().toLocaleString([], {year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit'}),
-            countriesGuessed: countriesGuessedNow,
-            timeTaken: timeTaken,
-            isTemp: true
-        };
-        leaderboard.push(currentUserTemp);
-    } else {
-        currentUserTemp.countriesGuessed = countriesGuessedNow;
-        currentUserTemp.timeTaken = timeTaken;
-    }
-
-    const oldRank = getUserRank(currentUserTemp);
-    sortLeaderboard();
-    trimLeaderboard();
-    const newRank = getUserRank(currentUserTemp);
-
-    let highlightEntry = null;
-    if (previousUserRank !== null && newRank < previousUserRank) {
-        highlightEntry = currentUserTemp;
-    }
-    previousUserRank = newRank;
-
-    renderLeaderboard(highlightEntry);
-}
-
-// Non-countries often included in world data might include:
-// - Hong Kong (a SAR of China)
-// - Puerto Rico (US territory)
-// - Greenland (part of Denmark)
-// - Western Sahara (disputed territory)
-// - French Guiana (overseas department of France)
-// - Bermuda, Cayman Islands, etc. (overseas territories)
-// Check your GeoJSON data to identify which appear.
+// Just ensure your code references the correct property for country names and that you remove any non-country entities if desired.
 </script>
 </body>
 </html>
