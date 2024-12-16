@@ -106,11 +106,6 @@ body.dark-mode {
     color: #e0e0e0; /* Light gray text */
 }
 
-.dark-mode #game-container {
-    /* The container can remain as is or be slightly lighter */
-    background: transparent; /* Let the body color show through */
-}
-
 .dark-mode #map-container {
     background: #1e1e1e; /* Slightly lighter dark background */
     border: 1px solid #444; /* Darker border */
@@ -151,9 +146,4 @@ body.dark-mode {
     border: 1px solid #555;
     background: #1e1e1e;
     color: #f0f0f0;
-}
-
-@keyframes highlightFade {
-    from { background-color: #444; }
-    to { background-color: #1e1e1e; }
 }
