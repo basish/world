@@ -48,9 +48,9 @@ const zoom = d3.zoom()
 const g = svg.append("g");
 
 // Load GeoJSON
-d3.json("world.geojson").then(data => {
+d3.json("countries.geojson").then(data => {
     countries = data.features.map(d => ({
-        name: d.properties.ADMIN,
+        name: d.properties.name,
         feature: d
     }));
 
@@ -204,7 +204,7 @@ function computeFontSize(feature) {
 
 function animateCountryGuess(country) {
     const sel = g.selectAll("path")
-      .filter(d => d.properties.ADMIN === country.name);
+      .filter(d => d.properties.name === country.name);
 
     // lighter green initially and fade over 1.8s
     sel
@@ -246,7 +246,7 @@ function endGame() {
           .text(m.name);
 
         g.selectAll("path")
-         .filter(d => d.properties.ADMIN === m.name)
+         .filter(d => d.properties.name === m.name)
          .classed("missed", true);
     });
 }
@@ -258,7 +258,7 @@ function endGameEarly() {
 }
 
 // If you want to use a different map/GeoJSON file, you can simply replace "world.geojson" with another file,
-// ensuring it has a similar structure (FeatureCollection with features having properties.ADMIN for country names).
+// ensuring it has a similar structure (FeatureCollection with features having properties.name for country names).
 // Reputable sources include:
 // - Natural Earth (https://www.naturalearthdata.com/)
 // - GADM (https://gadm.org/)
