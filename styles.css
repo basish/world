@@ -99,3 +99,51 @@ h1 {
     from { background-color: yellow; }
     to { background-color: white; }
 }
+
+/*====== dark mode ======*/ 
+body.dark-mode {
+    background: #121212;
+    color: #e0e0e0; /* Light gray text */
+}
+
+.dark-mode #map-container {
+    background: #1e1e1e; /* Slightly lighter dark background */
+    border: 1px solid #444; /* Darker border */
+}
+
+.dark-mode .country {
+    fill: #444;  /* Dark gray fill for countries */
+    stroke: #666; /* Slightly lighter stroke for visibility */
+}
+
+.dark-mode .country.highlighted {
+    fill: #6ecf6e !important; /* A subdued green that's still bright: #90EE90 is okay but can be tuned */
+}
+
+.dark-mode .country.missed {
+    fill: #cc6666 !important; /* A muted red that still pops on dark background */
+}
+
+.dark-mode .country-label {
+    fill: #a0ffa0; /* Light green label for guessed countries, readable on dark */
+}
+
+.dark-mode .country-label.missed-label {
+    fill: #ff9999; /* Softer red for missed labels */
+}
+
+.dark-mode .hovered {
+    stroke: #ccc; /* Lighter stroke on hover so it's visible against a dark fill */
+    fill-opacity: 0.8;
+}
+
+.dark-mode #leaderboard {
+    border: 1px solid #555;
+}
+
+.dark-mode #leaderboard th, 
+.dark-mode #leaderboard td {
+    border: 1px solid #555;
+    background: #1e1e1e;
+    color: #f0f0f0;
+}
