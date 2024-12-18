@@ -103,14 +103,22 @@ d3.json("world.geojson").then(data => {
     svg.call(zoom);
 });
 
+
+// Event Listeners
 nameInput.addEventListener('input', () => {
     startBtn.disabled = !nameInput.value.trim();
 });
-
-startBtn.addEventListener("click", startGame);
 pauseBtn.addEventListener("click", togglePause);
 endBtn.addEventListener("click", endGameEarly);
 guessInput.addEventListener("input", handleGuess);
+startBtn.addEventListener("click", startGame);
+document.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter' && !startBtn.disabled) {
+        startGame();
+    }
+});
+
+
 
 document.addEventListener('keydown', () => {
     if (!isPaused && !isGameOver) guessInput.focus();
