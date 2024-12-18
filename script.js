@@ -1,4 +1,4 @@
-// Configuration
+// configuration
 const TIMER_DURATION = 15 * 60; // 15 minutes in seconds
 let timeRemaining = TIMER_DURATION;
 let timerInterval = null;
@@ -11,6 +11,7 @@ let countries = [];
 let guessedCountries = new Set();
 const totalCountries = 197;
 
+// synonyms for shorthand guesses
 const abbreviations = {
     "usa": "United States of America",
     "uk": "United Kingdom",
@@ -19,36 +20,10 @@ const abbreviations = {
     "drc": "Democratic Republic of the Congo"
 };
 
-const synonyms = {
-    "usa": "United States of America",
-    "us": "United States of America",
-    "uk": "United Kingdom",
-    "uae": "United Arab Emirates",
-    "car": "Central African Republic",
-    "drc": "Democratic Republic of the Congo",
-    "serbia": "Republic of Serbia"
-};
-
-const continents = {
-   "Republic of Serbia": "Europe",
-   "United States of America": "North America",
-   "United Kingdom": "Europe",
-   "United Arab Emirates": "Asia",
-   "Central African Republic": "Africa",
-   "Democratic Republic of the Congo": "Africa"
-};
-
-const allContinents = ["Africa", "Asia", "Europe", "North America", "South America", "Oceania"];
-let continentCounts = {};
-let continentTotals = {};
-
-allContinents.forEach(cont => {
-    continentCounts[cont] = 0;
-    continentTotals[cont] = 0;
-});
-
+// we will store references to the circles for each country
 let countryCircles = new Map();
 
+// dom elements
 const startBtn = document.getElementById('start-btn');
 const pauseBtn = document.getElementById('pause-btn');
 const endBtn = document.getElementById('end-btn');
@@ -74,43 +49,34 @@ const zoom = d3.zoom()
 
 const g = svg.append("g");
 
-// Load GeoJSON
-function loadGeoJSON() {
-    d3.json("world.geojson").then(data => {
-        countries = data.features.map(d => ({
-            name: d.properties.ADMIN,
-            feature: d
-        }));
+// load geojson
+d3.json("world.geojson").then(data => {
+    countries = data.features.map(d => ({
+        name: d.properties.ADMIN,
+        feature: d
+    }));
 
-        g.selectAll("path")
-         .data(data.features)
-         .enter().append("path")
-         .attr("class", "country")
-         .attr("d", path);
+    g.selectAll("path")
+     .data(data.features)
+     .enter().append("path")
+     .attr("class", "country")
+     .attr("d", path);
 
-        countries.forEach(c => {
-            const centroid = path.centroid(c.feature);
-            const circle = g.append("circle")
-                .attr("cx", centroid[0])
-                .attr("cy", centroid[1])
-                .attr("r", 0.5)
-                .attr("fill", "darkblue");
+    // add a small light blue circle for each country at its centroid
+    countries.forEach(c => {
+        const centroid = path.centroid(c.feature);
+        const circle = g.append("circle")
+            .attr("cx", centroid[0])
+            .attr("cy", centroid[1])
+            .attr("r", .5) // small circle
+            .attr("fill", "darkblue");
 
-            countryCircles.set(c.name, circle);
-
-            let cont = continents[c.name];
-            if (cont) {
-                continentTotals[cont] = (continentTotals[cont] || 0) + 1;
-            }
-        });
-
-        svg.call(zoom);
+        countryCircles.set(c.name, circle);
     });
-}
 
-loadGeoJSON();
+    svg.call(zoom);
+});
 
-// Event listeners
 nameInput.addEventListener('input', () => {
     startBtn.disabled = !nameInput.value.trim();
 });
@@ -120,6 +86,10 @@ pauseBtn.addEventListener("click", togglePause);
 endBtn.addEventListener("click", endGameEarly);
 guessInput.addEventListener("input", handleGuess);
 
+document.addEventListener('keydown', () => {
+    if (!isPaused && !isGameOver) guessInput.focus();
+});
+
 function startGame() {
     userName = nameInput.value.trim();
     if (!userName) return;
@@ -127,6 +97,7 @@ function startGame() {
     guessInput.disabled = false;
     pauseBtn.disabled = false;
     endBtn.disabled = false;
+    guessInput.value = '';
     guessInput.focus();
     gameStartTime = Date.now();
 
@@ -137,14 +108,23 @@ function togglePause() {
     if (isGameOver) return;
     isPaused = !isPaused;
     if (isPaused) {
-        clearInterval(timerInterval);
+        pauseTimer();
         guessInput.disabled = true;
         pauseBtn.textContent = "Unpause";
     } else {
-        startTimer();
+        resumeTimer();
         guessInput.disabled = false;
+        guessInput.focus();
         pauseBtn.textContent = "Pause";
     }
+}
+
+function pauseTimer() {
+    clearInterval(timerInterval);
+}
+
+function resumeTimer() {
+    startTimer();
 }
 
 function startTimer() {
@@ -154,7 +134,10 @@ function startTimer() {
         if (!isPaused) {
             timeRemaining--;
             updateTimerDisplay();
-            if (timeRemaining <= 0) endGame();
+            if (timeRemaining <= 0) {
+                clearInterval(timerInterval);
+                endGame();
+            }
         }
     }, 1000);
 }
@@ -168,34 +151,87 @@ function updateTimerDisplay() {
 function handleGuess() {
     if (isPaused || isGameOver) return;
     let currentGuess = guessInput.value.trim().toLowerCase();
-    currentGuess = abbreviations[currentGuess] || currentGuess;
 
-    const matchedCountry = countries.find(c => c.name.toLowerCase() === currentGuess);
+    // apply abbreviations if any
+    if (abbreviations[currentGuess]) {
+        currentGuess = abbreviations[currentGuess].toLowerCase();
+    }
+
+    const matchedCountry = countries.find(c =>
+        c.name && c.name.toLowerCase() === currentGuess && !guessedCountries.has(c.name)
+    );
+
     if (matchedCountry) {
         guessedCountries.add(matchedCountry.name);
+        animateCountryGuess(matchedCountry);
+        guessInput.value = '';
         guessedCountSpan.textContent = `${guessedCountries.size}/${totalCountries}`;
 
+        // remove the circle for this country since it's now guessed
         const circle = countryCircles.get(matchedCountry.name);
-        if (circle) circle.remove();
-
-        guessInput.value = '';
+        if (circle) {
+            circle.remove();
+            countryCircles.delete(matchedCountry.name);
+        }
     }
+}
+
+function computeFontSize(feature) {
+    const bounds = path.bounds(feature);
+    const boxWidth = bounds[1][0] - bounds[0][0];
+    const boxHeight = bounds[1][1] - bounds[0][1];
+
+    const rawFontSize = Math.min(boxWidth, boxHeight) / 50;
+    const scaledFontSize = rawFontSize * 0.7; 
+    const finalFontSize = scaledFontSize * 0.8 * 0.7; 
+    return Math.max(Math.min(finalFontSize, 12), 4);
+}
+
+function animateCountryGuess(country) {
+    const sel = g.selectAll("path")
+      .filter(d => d.properties.ADMIN.toLowerCase().trim() === country.name.toLowerCase().trim());
+
+    sel
+      .transition().duration(0)
+      .style("fill", "#c0ffc0") 
+      .transition().duration(1800)
+      .style("fill", "#90EE90") 
+      .on("end", () => {
+          sel.classed("highlighted", true);
+      });
+
+    const fontSize = computeFontSize(country.feature);
+    const centroid = path.centroid(country.feature);
+    g.append("text")
+     .attr("class", "country-label")
+     .attr("x", centroid[0])
+     .attr("y", centroid[1])
+     .attr("font-size", fontSize + "px")
+     .text(country.name);
 }
 
 function endGame() {
     if (isGameOver) return;
     isGameOver = true;
+    guessInput.disabled = true;
+    pauseBtn.disabled = true;
+    endBtn.disabled = true;
     clearInterval(timerInterval);
-    
-    countries.filter(c => !guessedCountries.has(c.name)).forEach(m => {
+
+    const missingCountries = countries.filter(c => !guessedCountries.has(c.name));
+    missingCountries.forEach(m => {
+        const fontSize = computeFontSize(m.feature);
         const centroid = path.centroid(m.feature);
-        const fontSize = Math.min(12, Math.max(4, Math.min(20, 10)));
         g.append("text")
-         .attr("class", "missed-label")
-         .attr("x", centroid[0])
-         .attr("y", centroid[1])
-         .attr("font-size", fontSize + "px")
-         .text(m.name);
+          .attr("class", "country-label missed-label")
+          .attr("x", centroid[0])
+          .attr("y", centroid[1])
+          .attr("font-size", fontSize + "px")
+          .text(m.name);
+
+        g.selectAll("path")
+         .filter(d => d.properties.ADMIN === m.name)
+         .classed("missed", true);
     });
 }
 
