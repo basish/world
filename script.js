@@ -9,7 +9,7 @@ let gameStartTime = null;
 
 let countries = [];
 let guessedCountries = new Set();
-const totalCountries = 197;
+let totalCountries = 0;
 
 // synonyms for shorthand guesses
 const abbreviations = {
@@ -51,6 +51,10 @@ const g = svg.append("g");
 
 // load geojson
 d3.json("world_v2.geojson").then(data => {
+
+    totalCountries = data.features.length;
+    document.getElementById('guessed-count').textContent = `0/${totalCountries}`;
+
     countries = data.features.map(d => ({
         name: d.properties.name,
         feature: d
