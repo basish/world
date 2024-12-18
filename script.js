@@ -50,9 +50,9 @@ const zoom = d3.zoom()
 const g = svg.append("g");
 
 // load geojson
-d3.json("world.geojson").then(data => {
+d3.json("world_v2.geojson").then(data => {
     countries = data.features.map(d => ({
-        name: d.properties.ADMIN,
+        name: d.properties.name,
         feature: d
     }));
 
@@ -189,7 +189,7 @@ function computeFontSize(feature) {
 
 function animateCountryGuess(country) {
     const sel = g.selectAll("path")
-      .filter(d => d.properties.ADMIN.toLowerCase().trim() === country.name.toLowerCase().trim());
+      .filter(d => d.properties.name.toLowerCase().trim() === country.name.toLowerCase().trim());
 
     sel
       .transition().duration(0)
@@ -230,7 +230,7 @@ function endGame() {
           .text(m.name);
 
         g.selectAll("path")
-         .filter(d => d.properties.ADMIN === m.name)
+         .filter(d => d.properties.name === m.name)
          .classed("missed", true);
     });
 }
